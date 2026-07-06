@@ -3,12 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>My CodePen Premium v3</title>
+<title>My CodePen Premium</title>
 <style>
+  /* 全体のテーマとカラー設定 */
   :root {
-    --bg-color: #131417;
-    --panel-bg: #1d1e22;
-    --text-color: #ffffff;
+    --bg-color: #131417; 
+    --panel-bg: #1d1e22; 
+    --text-color: #ffffff; 
     --border-color: #34363e;
   }
   body {
@@ -17,13 +18,11 @@
     background-color: var(--bg-color); color: var(--text-color);
   }
 
-  /* ヘッダー全体のレイアウト（ボタンが多くても崩れないように調整） */
+  /* ヘッダーのレイアウト */
   header {
     display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center;
-    padding: 10px 20px; background-color: #000000; border-bottom: 1px solid var(--border-color);
-    gap: 10px;
+    padding: 10px 20px; background-color: #000000; border-bottom: 1px solid var(--border-color); gap: 10px;
   }
-  
   .title-area { display: flex; align-items: center; gap: 10px; }
   .title-area h1 { margin: 0; font-size: 20px; letter-spacing: 1px; color: #fff;}
   .title-area input {
@@ -31,13 +30,13 @@
     padding: 5px 10px; border-radius: 4px; font-size: 14px; width: 140px;
   }
   
-  /* 履歴管理エリア */
   .storage-area { display: flex; align-items: center; gap: 5px; }
   .storage-area select {
     background: #252526; color: #fff; border: 1px solid var(--border-color);
     padding: 5px; border-radius: 4px; max-width: 150px; font-size: 13px;
   }
 
+  /* ボタンのデザイン */
   .buttons { display: flex; align-items: center; gap: 5px; flex-wrap: wrap;}
   .buttons button {
     background-color: #444857; color: #fff; border: none; padding: 7px 12px;
@@ -45,7 +44,6 @@
   }
   .buttons button:hover { opacity: 0.8; }
   
-  /* 各ボタンの色設定 */
   .btn-save { background-color: #007acc !important; }
   .btn-delete { background-color: #ff3c41 !important; }
   .btn-import { background-color: #6a1b9a !important; }
@@ -53,7 +51,7 @@
   .btn-share { background-color: #ff9900 !important; color: #000 !important; }
   .btn-app { background-color: #47cf73 !important; color: #000 !important; }
 
-  /* エディターエリア */
+  /* エディター部分（HTML, CSS, JS）のレイアウト */
   .editors-container {
     display: flex; height: 45vh; border-bottom: 8px solid var(--border-color);
   }
@@ -64,8 +62,7 @@
   .editor:last-child { border-right: none; }
   
   .editor-header {
-    padding: 8px 15px; background-color: #1d1e22; font-size: 12px;
-    font-weight: bold; border-top: 3px solid; color: #aaaebc;
+    padding: 8px 15px; background-color: #1d1e22; font-size: 12px; font-weight: bold; border-top: 3px solid; color: #aaaebc;
   }
   .html-header { border-color: #ff3c41; }
   .css-header { border-color: #0ebeff; }
@@ -77,22 +74,14 @@
     resize: none; outline: none; line-height: 1.5;
   }
 
-  /* プレビューエリア */
-  .preview-container {
-    flex: 1; background-color: #fff; display: flex;
-  }
-  iframe {
-    width: 100%; height: 100%; border: none;
-  }
+  /* プレビュー画面のレイアウト */
+  .preview-container { flex: 1; background-color: #fff; display: flex; }
+  iframe { width: 100%; height: 100%; border: none; }
 
-  /* 児童配布用（全画面モード）のスタイル変更 */
+  /* 児童配布用（全画面モード）のスタイル切り替え */
   body.full-screen-mode header,
-  body.full-screen-mode .editors-container {
-    display: none !important;
-  }
-  body.full-screen-mode .preview-container {
-    height: 100vh;
-  }
+  body.full-screen-mode .editors-container { display: none !important; }
+  body.full-screen-mode .preview-container { height: 100vh; }
 </style>
 </head>
 <body>
@@ -115,8 +104,7 @@
     <button class="btn-import" onclick="document.getElementById('import-file').click()">📂 読込(.json)</button>
     <input type="file" id="import-file" style="display:none" accept=".json" onchange="importProject(event)">
     <button class="btn-export" onclick="exportProject()">📦 書出(.json)</button>
-    
-    <button class="btn-share" onclick="copyShareUrl()">🔗 児童用URLコピー</button>
+    <button class="btn-share" onclick="copyShareUrl()">🔗 短縮URLコピー</button>
     <button class="btn-app" onclick="downloadApp()">🌐 アプリ保存(.html)</button>
   </div>
 </header>
@@ -143,19 +131,15 @@
 <script>
   const STORAGE_KEY = 'mypen_local_history';
 
-  // 1. リアルタイムプレビュー
+  // 1. プレビューのリアルタイム更新（srcdocによる安全な表示）
   function updatePreview() {
-    const html = document.getElementById('html-code').value;
-    const css = "<style>" + document.getElementById('css-code').value + "</style>";
-    const js = "<script>" + document.getElementById('js-code').value + "<\/script>";
-    const iframe = document.getElementById('preview');
-    const previewDoc = iframe.contentDocument || iframe.contentWindow.document;
-    previewDoc.open();
-    previewDoc.write(html + css + js);
-    previewDoc.close();
+    const h = document.getElementById('html-code').value;
+    const c = "<style>" + document.getElementById('css-code').value + "</style>";
+    const j = "<script>" + document.getElementById('js-code').value + "<\/script>";
+    document.getElementById('preview').srcdoc = h + c + j;
   }
 
-  // 2. ブラウザへの履歴保存（複数保存対応）
+  // 2. ブラウザ内（ローカルストレージ）への保存機能
   function saveProject() {
     const title = document.getElementById('project-title').value.trim() || '無題の作品';
     const h = document.getElementById('html-code').value;
@@ -165,12 +149,11 @@
     let history = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
     history[title] = { h, c, j, updated: new Date().toLocaleTimeString() };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
-    
     updateProjectList();
-    alert('「' + title + '」をこのPCの履歴に保存しました。');
+    alert('「' + title + '」を保存しました。');
   }
 
-  // 3. プルダウンリストの更新
+  // 3. 履歴プルダウンリストの更新機能
   function updateProjectList() {
     const select = document.getElementById('project-list');
     select.innerHTML = '<option value="">-- 履歴から開く --</option>';
@@ -183,7 +166,7 @@
     }
   }
 
-  // 4. 履歴から読み込み
+  // 4. 履歴から作品を読み込む機能
   function loadProject(title) {
     if (!title) return;
     const history = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
@@ -197,21 +180,20 @@
     }
   }
 
-  // 5. 履歴の削除
+  // 5. 履歴の削除機能
   function deleteProject() {
     const select = document.getElementById('project-list');
     const title = select.value;
-    if (!title) { alert('消去する作品をリストから選んでください。'); return; }
+    if (!title) return;
     if (confirm('「' + title + '」の履歴を削除しますか？')) {
       let history = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
       delete history[title];
       localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
       updateProjectList();
-      alert('削除しました。');
     }
   }
 
-  // 6. 別のパソコンへのデータ書き出し（.json）
+  // 6. JSONファイルへの書き出し機能（別PC用）
   function exportProject() {
     const data = {
       title: document.getElementById('project-title').value,
@@ -226,7 +208,7 @@
     a.click();
   }
 
-  // 7. 別のパソコンからのデータ読み込み（.json）
+  // 7. JSONファイルの読み込み機能（別PCから）
   function importProject(event) {
     const file = event.target.files[0];
     if (!file) return;
@@ -239,39 +221,55 @@
         document.getElementById('css-code').value = data.css || '';
         document.getElementById('js-code').value = data.js || '';
         updatePreview();
-        alert('データを読み込みました！必要であれば「PC内保存」を押して履歴に追加してください。');
       } catch(err) {
-        alert('ファイルの読み込みに失敗しました。');
+        alert('読み込みに失敗しました。');
       }
     };
     reader.readAsText(file);
-    event.target.value = ''; // リセット
+    event.target.value = '';
   }
 
-  // 8. 児童への一発全画面共有リンク生成
-  function copyShareUrl() {
+  // 8. 短縮URL自動生成機能
+  async function copyShareUrl() {
     const h = document.getElementById('html-code').value;
     const c = document.getElementById('css-code').value;
     const j = document.getElementById('js-code').value;
     
-    // コードを圧縮してURLに乗せる処理
+    // 日本語も安全に暗号化する処理
     const dataStr = JSON.stringify({ h, c, j });
-    const base64 = btoa(encodeURIComponent(dataStr).replace(/%([0-9A-F]{2})/g, (match, p1) => String.fromCharCode('0x' + p1)));
+    const base64 = btoa(unescape(encodeURIComponent(dataStr)));
     
     let baseUrl = window.location.href.split('?')[0];
-    // CodespacesのプレビューURLの場合は警告
-    if(baseUrl.includes('github.dev')) {
-      alert('【注意】現在のURLは設定用のプレビュー画面です。GitHub Pagesで公開された正規のURL上でこのボタンを押してください。');
+    
+    // GitHub Codespacesのプレビュー画面からリンクを作ろうとした場合の警告
+    if(baseUrl.includes('github.dev') || baseUrl.includes('githubpreview.dev')) {
+      alert('【注意】現在のURLは設定用の非公開プレビュー画面です。GitHub Pagesで公開された正規のURL上でこのボタンを押してください。');
       return;
     }
     
-    const shareUrl = baseUrl + '?mode=full&data=' + base64;
-    navigator.clipboard.writeText(shareUrl).then(() => {
-      alert('児童用の全画面リンクをコピーしました！');
-    }).catch(err => alert('コピー失敗'));
+    const longUrl = baseUrl + '?mode=full&data=' + base64;
+    
+    try {
+      // is.gdのAPIを使用してURLを短縮
+      const response = await fetch('https://is.gd/create.php?format=json&url=' + encodeURIComponent(longUrl));
+      const data = await response.json();
+      
+      if (data.shorturl) {
+        navigator.clipboard.writeText(data.shorturl).then(() => {
+          alert('短いURLを作成してコピーしました！\n' + data.shorturl);
+        });
+      } else {
+        throw new Error('短縮エラー');
+      }
+    } catch (err) {
+      // API制限等で短縮できなかった場合は長いURLをそのままコピー
+      navigator.clipboard.writeText(longUrl).then(() => {
+        alert('コードの量が制限を超えたため、短縮URLが作れませんでした。\n代わりに従来の長いURLをコピーしました。\n※確実に送る場合は「アプリ保存(.html)」をご利用ください。');
+      });
+    }
   }
 
-  // 9. ローカルへのHTMLファイル書き出し（完成品アプリ）
+  // 9. 完成品アプリとしてHTMLファイル単体を書き出す機能
   function downloadApp() {
     const html = document.getElementById('html-code').value;
     const css = document.getElementById('css-code').value;
@@ -286,7 +284,7 @@
     URL.revokeObjectURL(url);
   }
 
-  // 10. 起動時の判定（全画面モード or 通常モード）
+  // 10. 起動時のURLチェックと復元処理（エラーハンドリング強化）
   window.onload = function() {
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get('mode') === 'full') {
@@ -294,19 +292,21 @@
       const base64 = urlParams.get('data');
       if (base64) {
         try {
-          const jsonStr = decodeURIComponent(atob(base64).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
+          const jsonStr = decodeURIComponent(escape(atob(base64)));
           const data = JSON.parse(jsonStr);
-          document.getElementById('html-code').value = data.h || '';
-          document.getElementById('css-code').value = data.c || '';
-          document.getElementById('js-code').value = data.j || '';
+          const h = data.h || '';
+          const c = "<style>" + (data.c || '') + "</style>";
+          const j = "<script>" + (data.j || '') + "<\/script>";
+          document.getElementById('preview').srcdoc = h + c + j;
         } catch (e) {
-          console.error('復元エラー', e);
+          // 暗号の解読に失敗（URLが途切れている）した場合の警告画面
+          document.body.innerHTML = '<h2 style="color:white; text-align:center; margin-top:50px; line-height:1.6;">⚠️ エラー：URLが途切れているか、データが壊れています。<br>コードの量が多すぎる可能性があります。<br>リンクが完全にコピーされているか確認してください。</h2>';
         }
       }
     } else {
       updateProjectList();
+      updatePreview();
     }
-    updatePreview();
   };
 </script>
 
