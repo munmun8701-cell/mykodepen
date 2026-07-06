@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My CodePen Premium</title>
+<style>
+  :root {
+    --bg-color: #131417;
+    --panel-bg: #1d1e22;
+    --text-color: #ffffff;
+    --border-color: #34363e;
+  }
+  body {
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+  }
+
+  /* ヘッダー */
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 20px;
+    background-color: #000000;
+    border-bottom: 1px solid var(--border-color);
+  }
+  .title-area { display: flex; align-items: center; gap: 15px; }
+  .title-area h1 { margin: 0; font-size: 20px; letter-spacing: 1px; }
+  .title-area input {
+    background: #252526;
+    color: #fff;
+    border: 1px solid var(--border-color);
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 14px;
+    width: 180px;
+  }
+  
+  /* 履歴管理エリア */
+  .storage-area { display: flex; align-items: center; gap: 10px; }
+  .storage-area select {
+    background: #252526;
+    color: #fff;
+    border: 1px solid var(--border-color);
+    padding: 5px;
+    border-radius: 4px;
+    max-width: 200px;
+  }
+
+  .buttons button {
+    background-color: #444857;
+    color: #fff;
+    border: none;
+    padding: 8px 14px;
+    border-radius: 4px;
+    font-weight: bold;
+    cursor: pointer;
+    margin-left: 5px;
+    transition: 0.2s;
+  }
+  .buttons button:hover { background-color: #5c6275; }
+  .buttons .btn-save { background-color: #007acc; }
+  .buttons .btn-save:hover { background-color: #0062a3; }
+  .buttons .btn-share { background-color: #ff9900; color: #000; }
+  .buttons .btn-share:hover { background-color: #e08800; }
+  .buttons .btn-export { background-color: #47cf73; color: #000; }
+  .buttons .btn-export:hover { background-color: #3bba63; }
+  .buttons .btn-delete { background-color: #ff3c41; }
+  .buttons .btn-delete:hover { background-color: #d32f33; }
+
+  /* エディターエリア */
+  .editors-container {
+    display: flex;
+    height: 45vh;
+    border-bottom: 8px solid var(--border-color);
+  }
+  .editor {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid var(--border-color);
+    background-color: var(--panel-bg);
+  }
+  .editor:last-child { border-right: none; }
+  
+  .editor-header {
+    padding: 8px 15px;
+    background-color: #1d1e22;
+    font-size: 12px;
+    font-weight: bold;
+    border-top: 3px solid;
+    color: #aaaebc;
+  }
+  .html-header { border-color: #ff3c41; }
+  .css-header { border-color: #0ebeff; }
+  .js-header { border-color: #fcd000; }
+  
+  textarea {
+    flex: 1;
+    background-color: var(--panel-bg);
+    color: #a9b7c6;
+    border: none;
+    padding: 15px;
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 14px;
+    resize: none;
+    outline: none;
+    line-height: 1.5;
+  }
+
+  /* プレビューエリア */
+  .preview-container {
+    flex: 1;
+    background-color: #fff;
+    display: flex;
+  }
+  iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+  }
+
+  /* 児童配布用（全画面モード）のスタイル変更 */
+  body.full-screen-mode header,
+  body.full-screen-mode .editors-container {
+    display: none !important;
+  }
+  body.full-screen-mode .preview-container {
+    height: 100vh;
+  }
+</style>
+</head>
+<body>
+
+<header id="main-header">
+  <div class="title-area">
+    <h1>MyPen</h1>
+    <input type="text" id="project-title" value="無題の作品" placeholder="作品のタイトル">
+    <button class="btn-save" onclick="saveProject()">💾 保存 (Save)</button>
+  </div>
+  
+  <div class="storage-area">
+    <select id="project-list" onchange="loadProject(this.value)">
+      <option value="">-- 過去の作品履歴 --</option>
+    </select>
+    <button class="btn-delete" onclick="deleteProject()">消去</button>
+  </div>
+
+  <div class="buttons">
+    <button class="btn-share" onclick="copyShareUrl()">🔗 児童用リンクをコピー</button>
+    <button class="btn-export" onclick="downloadCode()">ファイル書出</button>
+  </div>
+</header>
+
+<div class="editors-container" id="editors-box">
+  <div class="editor">
+    <div class="editor-header html-header">HTML</div>
+    <textarea id="html-code" oninput="updatePreview()" placeholder="<h1>Hello</h1>"></textarea>
+  </div>
+  <div class="editor">
+    <div class="editor-header css-header">CSS</div>
+    <textarea id="css-code" oninput="updatePreview()" placeholder="h1 { color: red; }"></textarea>
+  </div>
+  <div class="editor">
+    <div class="editor-header js-header">JS</div>
+    <textarea id="js-code" oninput="updatePreview()" placeholder="console.log('Ready');"></textarea>
+  </div>
+</div>
+
+<div class="preview-container">
+  <iframe id="preview"></iframe>
+</div>
+
+<script>
+  const STORAGE_KEY = 'mypen_local_history';
+
+  // 1. リアルタイムプレビュー
+  function updatePreview() {
+    const html = document.getElementById('html-code').value;
+    const css = "<style>" + document.getElementById('css-code').value + "</style>";
+    const js = "<script>" + document.getElementById('js-code').value + "<\/script>";
+    const iframe = document.getElementById('preview');
+    
+    const previewDoc = iframe.contentDocument || iframe.contentWindow.document;
+    previewDoc.open();
+    previewDoc.write(html + css + js);
+    previewDoc.close();
+  }
+
+  // 2. ブラウザへの履歴保存（LocalStorage）
+  function saveProject() {
+    const title = document.getElementById('project-title').value.trim() || '無題の作品';
+    const h = document.getElementById('html-code').value;
+    const c = document.getElementById('css-code').value;
+    const j = document.getElementById('js-code').value;
+    
+    let history = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+    history[title] = { h, c, j, updated: new Date().toLocaleString() };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
+    
+    updateProjectList();
+    alert('「' + title + '」をパソコン内に保存しました！');
+  }
+
+  function updateProjectList() {
+    const select = document.getElementById('project-list');
+    select.innerHTML = '<option value="">-- 過去の作品履歴 --</option>';
+    const history = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+    for (const title in history) {
+      const option = document.createElement('option');
+      option.value = title;
+      option.textContent = title + ' (' + history[title].updated + ')';
+      select.appendChild(option);
+    }
+  }
+
+  function loadProject(title) {
+    if (!title) return;
+    const history = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+    const project = history[title];
+    if (project) {
+      document.getElementById('project-title').value = title;
+      document.getElementById('html-code').value = project.h;
+      document.getElementById('css-code').value = project.c;
+      document.getElementById('js-code').value = project.j;
+      updatePreview();
+    }
+  }
+
+  function deleteProject() {
+    const select = document.getElementById('project-list');
+    const title = select.value;
+    if (!title) { alert('消去する作品を履歴から選んでください。'); return; }
+    if (confirm('「' + title + '」の履歴を削除しますか？')) {
+      let history = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+      delete history[title];
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
+      updateProjectList();
+      alert('削除しました。');
+    }
+  }
+
+  // 3. 【最重要】児童への一発全画面共有リンク生成
+  function copyShareUrl() {
+    const h = document.getElementById('html-code').value;
+    const c = document.getElementById('css-code').value;
+    const j = document.getElementById('js-code').value;
+    
+    // コードを圧縮してURLに乗せる処理（日本語対応）
+    const dataStr = JSON.stringify({ h, c, j });
+    const base64 = btoa(encodeURIComponent(dataStr).replace(/%([0-9A-F]{2})/g, (match, p1) => String.fromCharCode('0x' + p1)));
+    
+    // 現在のページのURL（GitHub PagesなどのURL）を取得して合体
+    const baseUrl = window.location.origin + window.location.pathname;
+    const shareUrl = baseUrl + '?mode=full&data=' + base64;
+    
+    // クリップボードにコピー
+    navigator.clipboard.writeText(shareUrl).then(() => {
+      alert('児童用の全画面リンクをクリップボードにコピーしました！そのまま連絡ツール等に貼り付けて送ってください。');
+    }).catch(err => {
+      alert('コピーに失敗しました。URL: ' + shareUrl);
+    });
+  }
+
+  // 4. 配布URLを開いたときの全画面化＆自動実行処理
+  function checkUrlParams() {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('mode') === 'full') {
+      // 児童用全画面モードがオンの場合、上半分を消してフルスクリーンにする
+      document.body.classList.add('full-screen-mode');
+      
+      const base64 = urlParams.get('data');
+      if (base64) {
+        try {
+          const jsonStr = decodeURIComponent(atob(base64).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
+          const data = JSON.parse(jsonStr);
+          
+          const iframe = document.getElementById('preview');
+          const previewDoc = iframe.contentDocument || iframe.contentWindow.document;
+          previewDoc.open();
+          previewDoc.write(data.h + "<style>" + data.c + "</style><script>" + data.js_code || data.j + "<\/script>");
+          previewDoc.close();
+        } catch (e) {
+          console.error('データ復元エラー', e);
+        }
+      }
+    } else {
+      // 通常モードなら履歴リストを更新
+      updateProjectList();
+      updatePreview();
+    }
+  }
+
+  // 5. ローカルへのHTMLファイル書き出し
+  function downloadCode() {
+    const html = document.getElementById('html-code').value;
+    const css = document.getElementById('css-code').value;
+    const js = document.getElementById('js-code').value;
+    const fullHTML = `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><title>App</title><style>${css}</style></head><body>${html}<script>${js}<\/script></body></html>`;
+    const blob = new Blob([fullHTML], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = (document.getElementById('project-title').value || 'app') + '.html';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  // 起動時にURLをチェック
+  window.onload = checkUrlParams;
+</script>
+
+</body>
+</html>
