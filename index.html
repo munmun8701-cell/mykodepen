@@ -3,19 +3,20 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>My CodePen Premium (Cloud Sync)</title>
+<title>My CodePen Premium (Manager Mode)</title>
 <style>
   :root { --bg-color: #131417; --panel-bg: #1d1e22; --text-color: #ffffff; --border-color: #34363e; }
   body { margin: 0; padding: 0; display: flex; flex-direction: column; height: 100vh; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--bg-color); color: var(--text-color); }
   
   header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; padding: 10px 20px; background-color: #000000; border-bottom: 1px solid var(--border-color); gap: 10px; }
-  .title-area { display: flex; align-items: center; gap: 10px; }
-  .title-area h1 { margin: 0; font-size: 20px; letter-spacing: 1px; color: #fff; margin-right: 15px;}
+  .title-area { display: flex; align-items: center; gap: 8px; }
+  .title-area h1 { margin: 0; font-size: 20px; letter-spacing: 1px; color: #fff; margin-right: 10px;}
   
-  input { background: #252526; color: #fff; border: 1px solid var(--border-color); padding: 5px 10px; border-radius: 4px; font-size: 13px; }
+  input, select { background: #252526; color: #fff; border: 1px solid var(--border-color); padding: 5px 10px; border-radius: 4px; font-size: 13px; }
+  input::placeholder { color: #666; }
+  
   .storage-area { display: flex; align-items: center; gap: 5px; }
-  .storage-area select { background: #252526; color: #fff; border: 1px solid var(--border-color); padding: 5px; border-radius: 4px; max-width: 150px; font-size: 13px; }
-
+  
   .buttons { display: flex; align-items: center; gap: 5px; flex-wrap: wrap;}
   .buttons button { background-color: #444857; color: #fff; border: none; padding: 7px 12px; border-radius: 4px; font-weight: bold; cursor: pointer; transition: 0.2s; font-size: 12px; }
   .buttons button:hover { opacity: 0.8; }
@@ -37,7 +38,6 @@
   .preview-container { flex: 1; background-color: #fff; display: flex; }
   iframe { width: 100%; height: 100%; border: none; }
 
-  /* 児童配布用（全画面モード）のスタイル */
   body.full-screen-mode header, body.full-screen-mode .editors-container { display: none !important; }
   body.full-screen-mode .preview-container { height: 100vh; }
 </style>
@@ -56,14 +56,24 @@
     </div>
 
     <div id="user-box" style="display:none; gap:5px; align-items:center;">
-      <input type="text" id="project-title" value="無題の作品" placeholder="作品タイトル" style="width:140px;">
+      <input type="text" id="project-folder" value="一般" placeholder="フォルダ名" style="width:90px; text-align: center; border-color: #ff9900;">
+      <span style="color:#aaa;">/</span>
+      <input type="text" id="project-title" value="無題の作品" placeholder="作品タイトル" style="width:130px;">
       <button class="btn-save" onclick="saveToCloud()">☁️ クラウド保存</button>
       <button class="btn-logout" onclick="logout()">ログアウト</button>
     </div>
   </div>
   
   <div class="storage-area">
-    <select id="project-list" onchange="loadFromCloud(this.value)">
+    <select id="filter-folder" onchange="renderFilteredList()" style="border-color: #6a1b9a;">
+      <option value="all">📁 全てのフォルダ</option>
+    </select>
+    <select id="sort-type" onchange="renderFilteredList()">
+      <option value="date-desc">🕒 新しい順</option>
+      <option value="date-asc">🕒 古い順</option>
+      <option value="title-asc">🔤 名前順</option>
+    </select>
+    <select id="project-list" onchange="loadFromCloud(this.value)" style="width:180px; font-weight: bold;">
       <option value="">-- ログインしてください --</option>
     </select>
     <button class="btn-delete" onclick="deleteFromCloud()">消去</button>
@@ -73,7 +83,6 @@
     <button class="btn-import" onclick="document.getElementById('import-file').click()">📂 読込</button>
     <input type="file" id="import-file" style="display:none" accept=".json" onchange="importProject(event)">
     <button class="btn-export" onclick="exportProject()">📦 書出</button>
-    
     <button class="btn-share" onclick="generateShortUrl()">🚀 児童用URLを発行</button>
     <button class="btn-app" onclick="downloadApp()">🌐 アプリ保存</button>
   </div>
@@ -92,7 +101,6 @@
   import { getFirestore, doc, setDoc, getDoc, collection, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
   import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-  // ▼ あなたのFirebase合鍵 ▼
   const firebaseConfig = {
     apiKey: "AIzaSyDY9664KdW_xp_1psH007rQQgkBubkrKRo",
     authDomain: "mycodepen-db.firebaseapp.com",
@@ -106,9 +114,10 @@
   const db = getFirestore(app);
   const auth = getAuth(app);
   const provider = new GoogleAuthProvider();
+  
   let currentUser = null;
+  let allRawProjects = []; // 取得した全データを一時保管する配列
 
-  // プレビューのリアルタイム更新
   window.updatePreview = function() {
     const h = document.getElementById('html-code').value;
     const c = "<style>" + document.getElementById('css-code').value + "</style>";
@@ -116,39 +125,34 @@
     document.getElementById('preview').srcdoc = h + c + j;
   };
 
-  // ==========================================
-  // 1. Googleログイン・ログアウト機能
-  // ==========================================
+  // --- ログイン・ログアウト管理 ---
   onAuthStateChanged(auth, (user) => {
     if (user) {
       currentUser = user;
       document.getElementById('login-box').style.display = 'none';
       document.getElementById('user-box').style.display = 'flex';
-      updateCloudProjectList();
+      fetchCloudData();
     } else {
       currentUser = null;
       document.getElementById('login-box').style.display = 'flex';
       document.getElementById('user-box').style.display = 'none';
       document.getElementById('project-list').innerHTML = '<option value="">-- ログインしてください --</option>';
+      document.getElementById('filter-folder').innerHTML = '<option value="all">📁 全てのフォルダ</option>';
+      allRawProjects = [];
     }
   });
 
   window.loginWithGoogle = async function() {
-    try {
-      await signInWithPopup(auth, provider);
-    } catch(e) {
-      console.error(e);
-      alert('ログインがキャンセルされたか、失敗しました。');
-    }
+    try { await signInWithPopup(auth, provider); } catch(e) { alert('ログイン失敗'); }
   };
-
   window.logout = function() { signOut(auth); };
 
   // ==========================================
-  // 2. クラウド保存・読み込み・削除機能
+  // クラウド保存（フォルダー情報と詳細タイムスタンプ付き）
   // ==========================================
   window.saveToCloud = async function() {
-    if(!currentUser) return alert('保存するにはログインが必要です。');
+    if(!currentUser) return alert('ログインが必要です。');
+    const folder = document.getElementById('project-folder').value.trim() || '一般';
     const title = document.getElementById('project-title').value.trim() || '無題の作品';
     const h = document.getElementById('html-code').value;
     const c = document.getElementById('css-code').value;
@@ -156,38 +160,121 @@
     
     try {
       await setDoc(doc(db, "users", currentUser.uid, "my_projects", title), {
-        html: h, css: c, js: j, updated: new Date().toLocaleTimeString()
+        html: h, css: c, js: j,
+        folder: folder,
+        updatedStr: new Date().toLocaleTimeString(),
+        timestamp: new Date().getTime() // 並び替え用の正確なタイムスタンプ
       });
-      alert(`「${title}」をクラウドに保存しました！`);
-      updateCloudProjectList();
+      alert(`フォルダー「${folder}」内に「${title}」を保存しました！`);
+      fetchCloudData();
     } catch (e) { alert('保存エラー: ' + e.message); }
   };
 
-  window.updateCloudProjectList = async function() {
+  // ==========================================
+  // データの一括取得と管理処理
+  // ==========================================
+  async function fetchCloudData() {
     if(!currentUser) return;
-    const select = document.getElementById('project-list');
-    select.innerHTML = '<option value="">-- クラウド履歴から開く --</option>';
+    allRawProjects = [];
+    const folderSelect = document.getElementById('filter-folder');
+    const currentFolderFilter = folderSelect.value; // 現在の選択を維持
     
     const querySnapshot = await getDocs(collection(db, "users", currentUser.uid, "my_projects"));
+    let folderSet = new Set();
+
     querySnapshot.forEach((doc) => {
       const data = doc.data();
-      const option = document.createElement('option');
-      option.value = doc.id;
-      option.textContent = `${doc.id} (${data.updated || ''})`;
-      select.appendChild(option);
+      allRawProjects.push({
+        id: doc.id,
+        title: doc.id,
+        folder: data.folder || '一般',
+        html: data.html || '',
+        css: data.css || '',
+        js: data.js || '',
+        updatedStr: data.updatedStr || '',
+        timestamp: data.timestamp || 0
+      });
+      folderSet.add(data.folder || '一般');
     });
+
+    // フォルダ選択プルダウンの再構築
+    folderSelect.innerHTML = '<option value="all">📁 全てのフォルダ</option>';
+    folderSet.forEach(f => {
+      const option = document.createElement('option');
+      option.value = f;
+      option.textContent = `📁 ${f}`;
+      if(f === currentFolderFilter) option.selected = true;
+      folderSelect.appendChild(option);
+    });
+
+    renderFilteredList();
+  }
+
+  // ==========================================
+  // フィルター・ソート・optgroupによる描画の実行
+  // ==========================================
+  window.renderFilteredList = function() {
+    const filterFolder = document.getElementById('filter-folder').value;
+    const sortType = document.getElementById('sort-type').value;
+    const projectSelect = document.getElementById('project-list');
+    
+    projectSelect.innerHTML = '<option value="">-- クラウドから開く --</option>';
+
+    // 1. フォルダで絞り込み
+    let filtered = allRawProjects.filter(p => {
+      if (filterFolder === 'all') return true;
+      return p.folder === filterFolder;
+    });
+
+    // 2. 指定の条件で並び替え
+    filtered.sort((a, b) => {
+      if (sortType === 'date-desc') return b.timestamp - a.timestamp; // 新しい順
+      if (sortType === 'date-asc') return a.timestamp - b.timestamp;  // 古い順
+      if (sortType === 'title-asc') return a.title.localeCompare(b.title); // 名前順
+      return 0;
+    });
+
+    // 3. フォルダごとに構造化して表示 (optgroupの作成)
+    if (filterFolder !== 'all') {
+      // 単一フォルダ表示の時はグループ分け不要
+      filtered.forEach(p => {
+        const option = document.createElement('option');
+        option.value = p.id;
+        option.textContent = `${p.title} (${p.updatedStr})`;
+        projectSelect.appendChild(option);
+      });
+    } else {
+      // 全表示の時はフォルダごとに綺麗に分ける
+      let groups = {};
+      filtered.forEach(p => {
+        if (!groups[p.folder]) groups[p.folder] = [];
+        groups[p.folder].push(p);
+      });
+
+      for (const folderName in groups) {
+        const groupTag = document.createElement('optgroup');
+        groupTag.label = `📂 ${folderName}`;
+        
+        groups[folderName].forEach(p => {
+          const option = document.createElement('option');
+          option.value = p.id;
+          option.textContent = `${p.title} (${p.updatedStr})`;
+          groupTag.appendChild(option);
+        });
+        projectSelect.appendChild(groupTag);
+      }
+    }
   };
 
   window.loadFromCloud = async function(title) {
     if (!title || !currentUser) return;
-    const docRef = doc(db, "users", currentUser.uid, "my_projects", title);
-    const docSnap = await getDoc(docRef);
-    if (docSnap.exists()) {
-      const data = docSnap.data();
-      document.getElementById('project-title').value = title;
-      document.getElementById('html-code').value = data.html || '';
-      document.getElementById('css-code').value = data.css || '';
-      document.getElementById('js-code').value = data.js || '';
+    const project = allRawProjects.find(p => p.id === title);
+    if (project) {
+      document.getElementById('project-folder').value = project.folder;
+      document.getElementById('project-title').value = project.title;
+      document.getElementById('html-code').value = project.html;
+      document.getElementById('css-code').value = project.css;
+      document.getElementById('js-code').value = project.js;
       window.updatePreview();
     }
   };
@@ -195,34 +282,27 @@
   window.deleteFromCloud = async function() {
     const select = document.getElementById('project-list');
     const title = select.value;
-    if (!title || !currentUser) return alert('消去する作品を選んでください。');
+    if (!title || !currentUser) return alert('作品を選んでください。');
     if (confirm(`「${title}」をクラウドから完全に削除しますか？`)) {
       await deleteDoc(doc(db, "users", currentUser.uid, "my_projects", title));
-      updateCloudProjectList();
+      fetchCloudData();
       alert('削除しました。');
     }
   };
 
-  // ==========================================
-  // 3. 児童用共有URL・ファイル書き出し機能
-  // ==========================================
+  // --- 共有・配布機能（変更なし） ---
   window.generateShortUrl = async function() {
     const h = document.getElementById('html-code').value;
     const c = document.getElementById('css-code').value;
     const j = document.getElementById('js-code').value;
     let baseUrl = window.location.href.split('?')[0];
-    
-    if(baseUrl.includes('github.dev') || baseUrl.includes('githubpreview.dev')) {
-      return alert('【注意】プレビュー画面ではURLを発行できません。GitHub Pagesで公開されたURL上でボタンを押してください。');
-    }
-    
-    const shortId = Math.random().toString(36).substring(2, 8); // 6桁のランダムID
+    if(baseUrl.includes('github.dev')) return alert('正規のURL上で実行してください。');
+    const shortId = Math.random().toString(36).substring(2, 8);
     try {
       await setDoc(doc(db, "shared_projects", shortId), { html: h, css: c, js: j });
-      const shareUrl = baseUrl + '?id=' + shortId;
-      await navigator.clipboard.writeText(shareUrl);
-      alert('データベースに保存し、児童用URLをコピーしました！\n\n' + shareUrl);
-    } catch(e) { alert('URL発行エラー: ' + e.message); }
+      await navigator.clipboard.writeText(baseUrl + '?id=' + shortId);
+      alert('児童用URLをコピーしました！');
+    } catch(e) { alert('URL発行エラー'); }
   };
 
   window.exportProject = function() {
@@ -243,9 +323,6 @@
     const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([`<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><title>App</title><style>${c}</style></head><body>${h}<script>${j}<\/script></body></html>`], { type: 'text/html' })); a.download = (document.getElementById('project-title').value || 'app') + '.html'; a.click();
   };
 
-  // ==========================================
-  // 4. 起動時のフルスクリーン（児童表示）判定
-  // ==========================================
   window.onload = async function() {
     const id = new URLSearchParams(window.location.search).get('id');
     if (id) {
@@ -255,8 +332,8 @@
         if (docSnap.exists()) {
           const d = docSnap.data();
           document.getElementById('preview').srcdoc = (d.html||'') + "<style>" + (d.css||'') + "</style><script>" + (d.js||'') + "<\/script>";
-        } else { document.body.innerHTML = '<h2 style="color:white;text-align:center;margin-top:50px;">データが見つかりません。</h2>'; }
-      } catch (e) { document.body.innerHTML = '<h2 style="color:white;text-align:center;margin-top:50px;">通信エラーが発生しました。</h2>'; }
+        } else { document.body.innerHTML = '<h2 style="color:white;text-align:center;">データが見つかりません。</h2>'; }
+      } catch (e) { document.body.innerHTML = '<h2 style="color:white;text-align:center;">通信エラー</h2>'; }
     } else {
       window.updatePreview();
     }
